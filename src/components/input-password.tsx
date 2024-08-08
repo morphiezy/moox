@@ -19,6 +19,7 @@ export const InputPassword = React.forwardRef<HTMLInputElement, InputProps>(
           type={visible ? "text" : "password"}
         />
         <Button
+          type="button"
           variant="ghost"
           size="icon"
           onClick={() => setVisible(!visible)}
