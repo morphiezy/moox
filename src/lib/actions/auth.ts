@@ -1,12 +1,15 @@
 "use server";
 
-import bcryptjs from "bcryptjs";
 import { redirect } from "next/navigation";
-import { randomBytes } from "crypto";
 import { User } from "@prisma/client";
+import { randomBytes } from "crypto";
+import { resend } from "../resend";
 import { prisma } from "../auth";
+import { hash } from "../utils";
 import { signupSchema } from "../validation";
+import VerifyEmail from "@/components/auth/email-verification";
 import type { SignUpFormState } from "@/types";
+import { findUserByEmail } from "./user";
 
 export const signUp = async (
   currentState: SignUpFormState,
@@ -24,67 +27,87 @@ export const signUp = async (
     };
   }
 
-  const isUserAvailable = await findUserByEmail(
-    formData.get("email") as string,
-  );
-
-  if (!!isUserAvailable) {
-    return {
-      errors: {
-        email: ["Email already in exist"],
-      },
-    };
-  }
-
-  const hashed = await hashedPassword(formData.get("password") as string);
-  const verificationToken = randomBytes(32).toString("hex");
-
-  let user: User;
+  const email = formData.get("email") as string;
+  const fullname = formData.get("fullname") as string;
+  const password = formData.get("password") as string;
 
   try {
-    user = await prisma.user.create({
-      data: {
-        email: formData.get("email") as string,
-        fullname: formData.get("fullname") as string,
-        password: hashed,
-        VerificationToken: {
-          create: {
-            token: verificationToken,
-            expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          },
-        },
-      },
-    });
-  } catch (error) {
-    if (error instanceof Error) {
+    const existingUser = await findUserByEmail(email);
+
+    if (!!existingUser && !existingUser.emailVerified) {
+      await handleResendVerification(existingUser);
+    } else if (!!existingUser) {
       return {
         errors: {
-          _form: [error.message],
+          email: ["Email already in exist"],
         },
       };
     } else {
-      return {
-        errors: {
-          _form: ["Something went wrong"],
-        },
-      };
+      await createUserAndSendVerification(email, fullname, password);
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      return { errors: { _form: [error.message] } };
+    } else {
+      return { errors: { _form: ["Something went wrong"] } };
     }
   }
 
-  redirect("/");
+  redirect("/auth/verify/send?email=" + email);
 };
 
-const findUserByEmail = async (email: string) => {
-  const user = prisma.user.findUnique({
-    where: {
-      email: email,
+const createUserAndSendVerification = async (
+  email: string,
+  fullname: string,
+  password: string,
+) => {
+  const hashedPassword = await hash(password);
+  const verificationToken = randomBytes(32).toString("hex");
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      fullname,
+      password: hashedPassword,
+      VerificationToken: {
+        create: {
+          token: verificationToken,
+          expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      },
     },
   });
 
-  return user;
+  await sendVerificationEmail(user.email, user.fullname, verificationToken);
 };
 
-const hashedPassword = async (password: string) => {
-  const salt = await bcryptjs.genSalt(10);
-  return bcryptjs.hash(password, salt);
+const handleResendVerification = async (user: User) => {
+  const verificationToken = randomBytes(32).toString("hex");
+
+  await prisma.verificationToken.update({
+    where: { userId: user.id },
+    data: {
+      token: verificationToken,
+      expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+
+  await sendVerificationEmail(user.email, user.fullname, verificationToken);
+};
+
+const sendVerificationEmail = async (
+  email: string,
+  fullname: string,
+  token: string,
+) => {
+  try {
+    await resend.emails.send({
+      from: "Moox <verify@yardan.my.id>",
+      to: email,
+      subject: "Moox Verification Token",
+      react: VerifyEmail({ fullname: fullname, token: token }),
+    });
+  } catch (error) {
+    throw new Error("Failed to send verification email");
+  }
 };
