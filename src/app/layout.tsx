@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { geistSans } from "@/lib/font";
 import "@/style/index.css";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "MOOX - Recommedation Movies Website",
@@ -14,7 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={geistSans.className}>{children}</body>
+      <body className={geistSans.className}>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

@@ -13,5 +13,11 @@ export function Envelope() {
     },
   } as Options;
 
-  return <Lottie options={defaultOptions} />;
+  return (
+    <Lottie
+      style={{ cursor: "default" }}
+      options={defaultOptions}
+      isClickToPauseDisabled
+    />
+  );
 }

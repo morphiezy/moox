@@ -10,13 +10,15 @@ import {
 } from "@react-email/components";
 
 interface EmailVerificationProps {
-  fullname?: string;
-  token?: string;
+  fullname: string;
+  token: string;
+  email: string;
 }
 
 export const EmailVerification = ({
   fullname,
   token,
+  email,
 }: EmailVerificationProps) => {
   return (
     <Html>
@@ -32,7 +34,7 @@ export const EmailVerification = ({
               clicking the link below:
             </Text>
             <Link
-              href={`${process.env.NEXT_PUBLIC_APP_URL}/auth/verify?token=${token}`}
+              href={`${process.env.NEXT_PUBLIC_APP_URL}/auth/verify?email=${email}&token=${token}`}
               target="_blank"
               style={{
                 ...link,

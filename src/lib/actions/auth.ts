@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { User } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { resend } from "../resend";
-import { prisma } from "../auth";
+import { prisma } from "../prisma";
 import { hash } from "../utils";
 import { signupSchema } from "../validation";
 import VerifyEmail from "@/components/auth/email-verification";
@@ -81,7 +81,7 @@ const createUserAndSendVerification = async (
   await sendVerificationEmail(user.email, user.fullname, verificationToken);
 };
 
-const handleResendVerification = async (user: User) => {
+export const handleResendVerification = async (user: User) => {
   const verificationToken = randomBytes(32).toString("hex");
 
   await prisma.verificationToken.update({
@@ -105,9 +105,66 @@ const sendVerificationEmail = async (
       from: "Moox <verify@yardan.my.id>",
       to: email,
       subject: "Moox Verification Token",
-      react: VerifyEmail({ fullname: fullname, token: token }),
+      react: VerifyEmail({ fullname, email, token }),
     });
   } catch (error) {
     throw new Error("Failed to send verification email");
+  }
+};
+
+import { Prisma } from "@prisma/client";
+
+export const verifyEmail = async (email: string, token: string) => {
+  try {
+    await prisma.$transaction(async (prisma) => {
+      const verifiedUser = await prisma.user.update({
+        where: {
+          email,
+          VerificationToken: {
+            token,
+          },
+        },
+        data: {
+          emailVerified: true,
+        },
+      });
+
+      if (!verifiedUser) {
+        throw new Error("Invalid verification token or email");
+      }
+
+      await prisma.verificationToken.delete({
+        where: {
+          userId: verifiedUser.id,
+        },
+      });
+
+      return verifiedUser;
+    });
+
+    return {
+      status: true,
+      message: "Email verified successfully",
+    };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return {
+        status: false,
+        message: "Something went wrong. Please try again later.",
+      };
+    } else if (
+      error instanceof Error &&
+      error.message === "Invalid verification token or email"
+    ) {
+      return {
+        status: false,
+        message: "Invalid verification token or email",
+      };
+    } else {
+      return {
+        status: false,
+        message: "An unexpected error occurred",
+      };
+    }
   }
 };

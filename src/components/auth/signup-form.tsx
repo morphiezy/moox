@@ -4,12 +4,12 @@ import React from "react";
 import Link from "next/link";
 import { useFormState } from "react-dom";
 import { FormMessage } from "../form-message";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InputPassword } from "../input-password";
 import { signUp } from "@/lib/actions/auth";
 import { SignUpFormState } from "@/types";
+import { SignUpButton } from "./signup-button";
 
 export function SignUpForm() {
   const [formState, action] = useFormState<SignUpFormState, FormData>(signUp, {
@@ -51,9 +51,7 @@ export function SignUpForm() {
           />
           <FormMessage error={formState?.errors?.password?.join(", ")} />
         </div>
-        <Button type="submit" className="w-full mt-4">
-          Create an account
-        </Button>
+        <SignUpButton />
       </div>
       <div className="mt-4 text-center text-sm">
         Already have an account?{" "}
